@@ -148,3 +148,39 @@ All previous features (1–18, 20, 22–25) have been completed. ✅
   - [ ] Install `@sentry/react`
   - [ ] Configure DSN via `.env.local`
   - [ ] Add error boundary reporting and performance tracing
+
+## 🚀 Part 7: Notion-Level Editor Improvements (ainote)
+
+- [ ] **Feature 25: Advanced Block-Based Editing (BlockNote Enhancement)**
+  - [ ] Complete drag-and-drop block support with visual drop indicators and multi-block selection.
+  - [ ] Implement nested blocks (indent/outdent with Tab/Shift+Tab) perfectly mapped to logical hierarchies.
+  - [ ] Add block conversion menus (e.g., turn a paragraph into a heading or to-do list seamlessly).
+
+- [ ] **Feature 26: Unified & Extensive Slash Commands (`/`)**
+  - [ ] Expand slash command menu to include all formatting types, lists, and embeds.
+  - [ ] Add search/filter capabilities to the slash menu (e.g., typing `/h1` filters down to Heading 1).
+  - [ ] Support custom block triggers via slash commands (e.g., `/kanban`, `/table`, `/calendar`).
+
+- [ ] **Feature 27: Perfect Copy/Paste (HTML & Markdown)**
+  - [ ] Upgrade the paste handler to perfectly parse rich HTML (tables, images, links, formatting) from other apps and web pages.
+  - [ ] Ensure all pasted content is properly tokenized into individual blocks instead of a single massive text node.
+  - [ ] Maintain nested structures (lists inside blockquotes) during copy/paste operations.
+
+- [ ] **Feature 28: Advanced Rich Text Properties & Floating Menus**
+  - [ ] Implement a Notion-style contextual floating toolbar that appears exactly above selected text.
+  - [ ] Add robust color picker support (text color, background/highlight color) with recent colors and hex inputs.
+  - [ ] Support easy creation and editing of inline links with a dedicated popover (similar to Notion's link editor).
+
+- [ ] **Feature 29: Rich Media & Embeds Integration**
+  - [ ] Enhance image blocks: resizing via drag handles, alignment options, and captions.
+  - [ ] Add support for embedding web bookmarks (Open Graph previews) directly inline within the editor.
+  - [ ] Add video and audio embed blocks (YouTube, local files).
+
+- [ ] **Feature 30: Database & Structural Blocks**
+  - [ ] Implement an inline relational Table block with column types (Text, Number, Select, Date).
+  - [ ] Add inline Kanban and Calendar views that sync with the table data.
+  - [ ] Support collapsible toggle lists (similar to `<details>`/`<summary>`).
+
+- [ ] **Feature 31: Page Context & Aesthetics**
+  - [ ] Add page-level Covers (upload, Unsplash search, colors) and Page Icons (Emojis/custom icons).
+  - [ ] Implement page properties metadata block at the top of notes (Tags, Date Created, Author).
