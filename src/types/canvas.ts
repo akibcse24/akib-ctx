@@ -23,7 +23,8 @@ export type NodeType =
   | 'fileAttachment'
   | 'spreadsheet'
   | 'databaseNode'
-  | 'dailyLog';
+  | 'dailyLog'
+  | 'v2Note';
 
 /** Shared optional fields available on all node data */
 export interface SharedNodeFields {
@@ -218,6 +219,17 @@ export interface DailyLogNodeData extends SharedNodeFields {
   entries: { id: string; timestamp: string; text: string; done?: boolean }[];
 }
 
+/**
+ * V2NoteNodeData — data shape for the V2 Block-Editor-only note node.
+ * Content is stored as a BlockNote Block[] (blockVersion: 2).
+ */
+export interface V2NoteNodeData extends SharedNodeFields {
+  title?: string;
+  /** BlockNote Block[] document. Always blockVersion: 2. */
+  content?: any[];
+  progress?: number;
+}
+
 export type CanvasNodeData =
   | AINoteNodeData
   | SummaryNodeData
@@ -243,7 +255,8 @@ export type CanvasNodeData =
   | DatabaseNodeData
   | DailyLogNodeData
   | VideoNodeData
-  | TableNodeData;
+  | TableNodeData
+  | V2NoteNodeData;
 
 export interface Workspace {
   id: string;

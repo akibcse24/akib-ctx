@@ -1,5 +1,5 @@
 import { useCanvasStore } from '@/store/canvasStore';
-import { FileText, StickyNote, HelpCircle, BookOpen, FileUp, ImagePlus, Square, GraduationCap, MessageSquare, CheckSquare, Type, Diamond, Sigma, Video, Table2, PlusCircle } from 'lucide-react';
+import { FileText, StickyNote, HelpCircle, BookOpen, FileUp, ImagePlus, Square, GraduationCap, MessageSquare, CheckSquare, Type, Diamond, Sigma, Video, Table2, PlusCircle, Blocks } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import type { NodeType } from '@/types/canvas';
@@ -7,6 +7,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 
 const menuItems: { type: NodeType; label: string; icon: React.ElementType; separator?: boolean; category?: string }[] = [
   { type: 'aiNote', label: 'AI Note', icon: FileText, category: 'AI Tools' },
+  { type: 'v2Note', label: 'V2 Note ✦', icon: Blocks, category: 'AI Tools' },
   { type: 'flashcard', label: 'Flashcards', icon: GraduationCap, category: 'AI Tools' },
   { type: 'lectureNotes', label: 'Lecture Notes', icon: BookOpen, category: 'Notes' },
   { type: 'summary', label: 'Summary Box', icon: StickyNote, category: 'Notes' },
@@ -42,6 +43,7 @@ const defaultDataForType = (type: NodeType): Record<string, unknown> => {
     case 'math': return { title: 'Math', latex: '' };
     case 'video': return { url: '', title: '' };
     case 'table': return { title: 'Table', headers: ['Col A', 'Col B', 'Col C'], rows: [[{ value: '' }, { value: '' }, { value: '' }]] };
+    case 'v2Note': return { title: 'V2 Note', content: [], blockVersion: 2 };
   }
 };
 
@@ -64,6 +66,7 @@ const defaultSizeForType = (type: NodeType): { width: number; height: number } =
     case 'math': return { width: 500, height: 260 };
     case 'video': return { width: 420, height: 320 };
     case 'table': return { width: 400, height: 300 };
+    case 'v2Note': return { width: 420, height: 500 };
   }
 };
 

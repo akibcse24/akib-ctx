@@ -219,7 +219,7 @@ function ReadOnlyPDF({ storageUrl, fileType, fileName }: { storageUrl?: string; 
 
 /* ─── Type classification ─── */
 
-const EXPANDABLE_TYPES = ['aiNote', 'lectureNotes', 'checklist', 'summary', 'codeSnippet', 'math', 'termQuestion', 'stickyNote', 'flashcard', 'table', 'image', 'embed', 'drawing', 'video', 'text', 'pdf'];
+const EXPANDABLE_TYPES = ['aiNote', 'lectureNotes', 'checklist', 'summary', 'codeSnippet', 'math', 'termQuestion', 'stickyNote', 'flashcard', 'table', 'image', 'embed', 'drawing', 'video', 'text', 'pdf', 'v2Note'];
 
 /* ─── Content renderer ─── */
 
@@ -230,6 +230,7 @@ function NodeContent({ node }: { node: Node }) {
   switch (type) {
     case 'aiNote':
     case 'lectureNotes':
+    case 'v2Note':
       return <ReadOnlyRichText content={data.content} />;
     case 'checklist':
       return <ReadOnlyChecklist items={data.items || []} />;
@@ -286,6 +287,7 @@ function NodeContent({ node }: { node: Node }) {
 const TYPE_LABELS: Record<string, string> = {
   aiNote: 'Note',
   lectureNotes: 'Lecture',
+  v2Note: 'V2 Note',
   checklist: 'Checklist',
   summary: 'Summary',
   codeSnippet: 'Code',

@@ -1,5 +1,5 @@
 import { Panel, useReactFlow } from '@xyflow/react';
-import { NotebookPen, StickyNote, HelpCircle, BookOpen, FileUp, ImagePlus, Square, Sparkles, Plus, GraduationCap, MessageSquarePlus, ListTodo, Type, Circle, Diamond, Triangle, Pen, Globe, Sigma, Video, Table2, Braces, Cable, Columns3, Bookmark, CalendarDays, Paperclip, Sheet, Clock, LayoutDashboard } from 'lucide-react';
+import { NotebookPen, StickyNote, HelpCircle, BookOpen, FileUp, ImagePlus, Square, Sparkles, Plus, GraduationCap, MessageSquarePlus, ListTodo, Type, Circle, Diamond, Triangle, Pen, Globe, Sigma, Video, Table2, Braces, Cable, Columns3, Bookmark, CalendarDays, Paperclip, Sheet, Clock, LayoutDashboard, Blocks } from 'lucide-react';
 import { useCanvasStore } from '@/store/canvasStore';
 import { useState } from 'react';
 import { toast } from 'sonner';
@@ -12,6 +12,7 @@ const categories: { label: string; items: { type: NodeType; label: string; icon:
     label: 'Knowledge',
     items: [
       { type: 'aiNote', label: 'AI Note', icon: NotebookPen, color: 'text-primary' },
+      { type: 'v2Note', label: 'V2 Note', icon: Blocks, color: 'text-violet-400' },
       { type: 'summary', label: 'Summary', icon: StickyNote, color: 'text-yellow' },
       { type: 'lectureNotes', label: 'Lecture', icon: BookOpen, color: 'text-cyan' },
       { type: 'flashcard', label: 'Flashcard', icon: GraduationCap, color: 'text-pink' },
@@ -90,6 +91,7 @@ const defaultDataForType = (type: NodeType): Record<string, unknown> => {
     case 'spreadsheet': return { title: 'Spreadsheet', grid: Array.from({ length: 4 }, () => Array.from({ length: 4 }, () => ({ value: '' }))) };
     case 'databaseNode': return { title: 'Database', columns: [{ id: 'name', name: 'Name', type: 'text' }, { id: 'status', name: 'Status', type: 'text' }], rows: [{ id: '1', name: 'Example Item', status: 'In Progress' }] };
     case 'dailyLog': return { title: 'Daily Log', entries: [] };
+    case 'v2Note': return { title: 'V2 Note', content: [], blockVersion: 2 };
   }
 };
 
@@ -120,6 +122,7 @@ const defaultSizeForType = (type: NodeType): { width: number; height?: number | 
     case 'spreadsheet': return { width: 400, height: 'auto' };
     case 'databaseNode': return { width: 600, height: 'auto' };
     case 'dailyLog': return { width: 300, height: 'auto' };
+    case 'v2Note': return { width: 420, height: 'auto' };
   }
 };
 

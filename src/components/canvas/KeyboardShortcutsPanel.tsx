@@ -27,6 +27,8 @@ export function KeyboardShortcutsPanel() {
       { keys: formatHotkey(hotkeys.copy), label: 'Copy nodes' },
       { keys: formatHotkey(hotkeys.paste), label: 'Paste' },
       { keys: formatHotkey(hotkeys.selectAll), label: 'Select all' },
+      { keys: formatHotkey(hotkeys.newNote || 'n'), label: 'New AI Note' },
+      { keys: formatHotkey(hotkeys.newV2Note || 'mod+n'), label: 'New V2 Note' },
       { keys: ['Del'], label: 'Delete selected' },
       { keys: ['Esc'], label: 'Close menus / exit drawing' },
     ]},

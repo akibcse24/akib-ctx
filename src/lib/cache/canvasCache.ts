@@ -440,15 +440,17 @@ function isAuthError(err: unknown): boolean {
 function isNetworkError(err: unknown): boolean {
   const code = String((err as Record<string, unknown>)?.code || '');
   const msg = String((err as Record<string, unknown>)?.message || '');
-  return !navigator.onLine || 
-         msg.includes('Failed to fetch') || 
+  return !navigator.onLine ||
+         msg.includes('Failed to fetch') ||
          (err as Record<string, unknown>)?.name === 'TypeError' ||
-         code === 'unavailable' || 
-         code === 'deadline-exceeded' || 
+         code === 'unavailable' ||
+         code === 'deadline-exceeded' ||
          code === 'cancelled' ||
+         code === 'blocked' ||
          msg.includes('network') ||
          msg.includes('channel') ||
-         msg.includes('Failed to get document');
+         msg.includes('Failed to get document') ||
+         msg.includes('ERR_BLOCKED_BY_CLIENT');
 }
 
 async function withRetry<T>(fn: () => Promise<T>, attempts = 3): Promise<T> {

@@ -645,6 +645,17 @@ export function CanvasWrapper() {
           style: { width: 380, height: 500 },
         });
       }
+      if (isHotkeyMatch(e, hotkeys.newV2Note || 'mod+n')) {
+        e.preventDefault();
+        const pos = useCanvasStore.getState().lastCursorFlowPosition || { x: 0, y: 0 };
+        addNode({
+          id: crypto.randomUUID(),
+          type: 'v2Note',
+          position: pos,
+          data: { title: 'New V2 Note', content: [], blockVersion: 2 },
+          style: { width: 380, height: 500 },
+        });
+      }
       if (isHotkeyMatch(e, hotkeys.toggleZenMode)) { e.preventDefault(); toggleZenMode(); }
       if (isHotkeyMatch(e, hotkeys.toggleFocusMode)) { e.preventDefault(); toggleFocusMode(); }
       if (isHotkeyMatch(e, hotkeys.toggleDrawingMode)) { e.preventDefault(); setDrawingMode(!drawingMode); }

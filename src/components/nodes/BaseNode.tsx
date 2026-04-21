@@ -57,6 +57,7 @@ const NODE_TYPE_ACCENTS: Record<string, { border: string; indicator: string }> =
   codeSnippet: { border: 'border-l-green', indicator: 'bg-green' },
   text: { border: 'border-l-muted-foreground', indicator: 'bg-muted-foreground' },
   drawing: { border: 'border-l-primary', indicator: 'bg-primary' },
+  v2Note: { border: 'border-l-violet-400', indicator: 'bg-violet-400' },
 };
 
 function getDueDateColor(dueDate: string): string {

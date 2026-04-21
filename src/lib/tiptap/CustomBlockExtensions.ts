@@ -100,7 +100,7 @@ export const BadgeExtension = Node.create({
   },
 
   renderHTML({ HTMLAttributes }) {
-    return ['span', mergeAttributes({ class: 'editor-badge' }), HTMLAttributes.label];
+    return ['span', mergeAttributes({ class: 'editor-badge' }), HTMLAttributes.label || 'Badge'];
   },
 
   addCommands() {
@@ -306,8 +306,8 @@ export const FootnoteRefExtension = Node.create({
   renderHTML({ HTMLAttributes }) {
     return [
       'sup',
-      mergeAttributes({ class: 'footnote-ref', 'data-footnote-id': HTMLAttributes.noteId }),
-      `[${HTMLAttributes.label}]`,
+      mergeAttributes({ class: 'footnote-ref', 'data-footnote-id': HTMLAttributes.noteId || '1' }),
+      `[${HTMLAttributes.label || HTMLAttributes.noteId || '1'}]`,
     ];
   },
 });

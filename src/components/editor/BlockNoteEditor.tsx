@@ -1,10 +1,22 @@
 import { useCreateBlockNote } from "@blocknote/react";
+import {
+  FormattingToolbar,
+  FormattingToolbarController,
+  BasicTextStyleButton,
+  BlockTypeSelect,
+  ColorStyleButton,
+  CreateLinkButton,
+  NestBlockButton,
+  UnnestBlockButton,
+  TextAlignButton,
+} from "@blocknote/react";
 import { BlockNoteView } from "@blocknote/mantine";
 import { MantineProvider } from "@mantine/core";
 import "@blocknote/core/fonts/inter.css";
 import "@blocknote/mantine/style.css";
 import "@mantine/core/styles.css";
 import { useEffect, useRef, useMemo, useCallback, memo } from "react";
+import { useTheme } from "next-themes";
 import { cn } from "@/lib/utils";
 import {
   BlockNoteSchema,
@@ -13,43 +25,74 @@ import {
   Block,
 } from "@blocknote/core";
 
-// Syntax highlighting
+// Syntax highlighting — do NOT import any highlight.js theme CSS here.
+// We ship our own full One Dark Pro palette in the component's <style> tag
+// so it stays scoped and doesn't fight global stylesheets.
 import { createLowlight, all } from "lowlight";
-import "highlight.js/styles/github-dark.css";
 
 const lowlight = createLowlight(all);
 
 /**
  * @function highlightCode
  * @description Syntax-highlights code for BlockNote's code block extension.
- * Falls back to plain text if the language is not registered or highlighting fails.
+ * Auto-detects language when none is specified (or 'plaintext') using
+ * lowlight's highlightAuto, then falls back to plain text on any error.
+ * This gives Notion-style auto-coloring without requiring the user to pick a language.
  * @param {string} code - Source code to highlight
- * @param {string} language - Language identifier (e.g. 'typescript')
+ * @param {string} language - Language identifier; empty/plaintext triggers auto-detect
  * @returns Lowlight HAST root
+ * @security No external network calls — fully client-side
  */
 const highlightCode = (code: string, language: string) => {
   try {
-    const lang = language || 'plaintext';
     const registered = lowlight.listLanguages();
-    const targetLang = registered.includes(lang) ? lang : 'plaintext';
-    return lowlight.highlight(targetLang, code);
+    // Auto-detect when language is unset or explicitly 'plaintext'
+    if (!language || language === 'plaintext' || language === 'auto') {
+      if (code.trim().length > 0) {
+        const result = lowlight.highlightAuto(code, {
+          subset: [
+            'javascript', 'typescript', 'python', 'html', 'css', 'json',
+            'bash', 'sql', 'rust', 'go', 'java', 'cpp', 'csharp', 'php',
+            'kotlin', 'swift', 'ruby', 'markdown', 'yaml', 'xml',
+          ],
+        });
+        return result.children;
+      }
+      return lowlight.highlight('plaintext', code).children;
+    }
+    const targetLang = registered.includes(language) ? language : 'plaintext';
+    return lowlight.highlight(targetLang, code).children;
   } catch {
-    return { type: 'root', children: [{ type: 'text', value: code }] } as any;
+    // Return a minimal HAST text node array so BlockNote doesn't crash
+    return [{ type: 'text' as const, value: code }];
   }
 };
 
 const supportedLanguages = {
-  javascript: { name: "JavaScript", aliases: ["js"] },
-  typescript: { name: "TypeScript", aliases: ["ts"] },
-  python: { name: "Python", aliases: ["py"] },
-  html: { name: "HTML" },
-  css: { name: "CSS" },
-  json: { name: "JSON" },
-  markdown: { name: "Markdown", aliases: ["md"] },
-  bash: { name: "Bash", aliases: ["sh"] },
-  sql: { name: "SQL" },
-  cpp: { name: "C++" },
-  csharp: { name: "C#" },
+  plaintext:  { name: 'Plain Text' },
+  javascript: { name: 'JavaScript', aliases: ['js', 'jsx'] },
+  typescript: { name: 'TypeScript', aliases: ['ts', 'tsx'] },
+  python:     { name: 'Python',     aliases: ['py'] },
+  html:       { name: 'HTML' },
+  css:        { name: 'CSS', aliases: ['scss', 'sass', 'less'] },
+  json:       { name: 'JSON' },
+  markdown:   { name: 'Markdown', aliases: ['md'] },
+  bash:       { name: 'Bash', aliases: ['sh', 'shell', 'zsh'] },
+  sql:        { name: 'SQL' },
+  cpp:        { name: 'C++', aliases: ['c', 'h'] },
+  csharp:     { name: 'C#', aliases: ['cs'] },
+  java:       { name: 'Java' },
+  go:         { name: 'Go', aliases: ['golang'] },
+  rust:       { name: 'Rust', aliases: ['rs'] },
+  php:        { name: 'PHP' },
+  ruby:       { name: 'Ruby', aliases: ['rb'] },
+  kotlin:     { name: 'Kotlin', aliases: ['kt'] },
+  swift:      { name: 'Swift' },
+  yaml:       { name: 'YAML', aliases: ['yml'] },
+  xml:        { name: 'XML' },
+  graphql:    { name: 'GraphQL', aliases: ['gql'] },
+  dockerfile: { name: 'Dockerfile' },
+  nginx:      { name: 'Nginx' },
 };
 
 /**
@@ -129,6 +172,7 @@ export const BlockNoteEditor = memo(({
   editable = true,
 }: BlockNoteEditorProps) => {
   const isInitialMount = useRef(true);
+  const syncLock = useRef(false);
   const lastEmittedContent = useRef<string>("");
   const initialContentApplied = useRef(false);
   const pasteAppliedRef = useRef<string | null>(null);
@@ -136,19 +180,32 @@ export const BlockNoteEditor = memo(({
   const onLoadErrorRef = useRef(onLoadError);
   onLoadErrorRef.current = onLoadError;
 
+  // Follow actual system/user theme — resolvedTheme gives the computed value
+  const { resolvedTheme } = useTheme();
+  const isDark = resolvedTheme !== 'light';
+  // BlockNote expects 'light' or 'dark'
+  const blockNoteTheme = isDark ? 'dark' : 'light';
+  // CSS values for code block that change with theme
+  const codeBlockBg   = isDark ? '#0d1117' : '#f6f8fa';
+  const codeBlockBorder = isDark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.09)';
+  const codeBlockText  = isDark ? '#cdd9e5' : '#24292e';
+
   // Trace: customBlockSpecs — O(1) memoized, only rebuilt if deps change
+  // Fix: Provide minimal highlighter that implements the required interface
   const customBlockSpecs = useMemo(() => {
+    const createLowlightHighlighter = () =>
+      Promise.resolve({
+        codeToHast: highlightCode,
+        getLoadedLanguages: () => lowlight.listLanguages(),
+        getLoadedThemes: () => [],
+        loadTheme: () => Promise.resolve(),
+      });
+
     return {
       ...defaultBlockSpecs,
       codeBlock: createCodeBlockSpec({
         supportedLanguages,
-        createHighlighter: () => Promise.resolve({
-          codeToHast: highlightCode,
-          // BlockNote calls getLoadedLanguages() and getLoadedThemes() on the highlighter.
-          getLoadedLanguages: () => lowlight.listLanguages(),
-          getLoadedThemes: () => [],
-          loadTheme: () => Promise.resolve(),
-        } as any),
+        createHighlighter: createLowlightHighlighter,
       }),
     };
   }, []);
@@ -366,7 +423,6 @@ export const BlockNoteEditor = memo(({
     }
 
     let cancelled = false;
-    let rafHandle: number;
 
     const applyContent = () => {
       if (cancelled) return;
@@ -379,13 +435,16 @@ export const BlockNoteEditor = memo(({
 
       // Phase 1: Optimistic batch — fast path for well-formed content
       try {
+        syncLock.current = true;
         editor.replaceBlocks(editor.document, safeContent);
         if (!cancelled) {
           initialContentApplied.current = true;
           lastEmittedContent.current = JSON.stringify(editor.document);
         }
+        syncLock.current = false;
         return;
       } catch (batchError) {
+        syncLock.current = false;
         console.warn(
           '[BlockNote] Batch replaceBlocks failed, switching to resilient one-by-one mode:',
           (batchError as Error)?.message ?? batchError
@@ -397,26 +456,29 @@ export const BlockNoteEditor = memo(({
       if (cancelled) return;
 
       let inserted = 0;
-      for (let i = 0; i < safeContent.length; i++) {
-        if (cancelled) break;
-        try {
-          const block = safeContent[i];
-          if (i === 0) {
-            // Replace the initial empty document with the first block
-            editor.replaceBlocks(editor.document, [block]);
-          } else {
-            // Append after the last block in the document
-            const lastDoc = editor.document;
-            const anchor = lastDoc[lastDoc.length - 1];
-            if (anchor) editor.insertBlocks([block], anchor, 'after');
+      syncLock.current = true;
+      try {
+        for (let i = 0; i < safeContent.length; i++) {
+          if (cancelled) break;
+          try {
+            const block = safeContent[i];
+            if (i === 0) {
+              editor.replaceBlocks(editor.document, [block]);
+            } else {
+              const lastDoc = editor.document;
+              const anchor = lastDoc[lastDoc.length - 1];
+              if (anchor) editor.insertBlocks([block], anchor, 'after');
+            }
+            inserted++;
+          } catch (blockError) {
+            console.warn(
+              `[BlockNote] Skipping block ${i} (type="${safeContent[i]?.type}") — schema error:`,
+              (blockError as Error)?.message ?? blockError
+            );
           }
-          inserted++;
-        } catch (blockError) {
-          console.warn(
-            `[BlockNote] Skipping block ${i} (type="${safeContent[i]?.type}") — schema error:`,
-            (blockError as Error)?.message ?? blockError
-          );
         }
+      } finally {
+        syncLock.current = false;
       }
 
       if (!cancelled) {
@@ -432,13 +494,15 @@ export const BlockNoteEditor = memo(({
     };
 
     // Defer by one animation frame to let ProseMirror commit its initial transaction
-    rafHandle = requestAnimationFrame(applyContent);
+    const rafHandle = requestAnimationFrame(applyContent);
 
     return () => {
       cancelled = true;
       cancelAnimationFrame(rafHandle);
     };
   }, [editor, initialContent, sanitizeBlocks]);
+
+
 
   // Handle paste content separately - only once per unique paste/node session
   useEffect(() => {
@@ -463,13 +527,18 @@ export const BlockNoteEditor = memo(({
         }
 
         if (blocks.length > 0) {
-          const lastBlock = editor.document[editor.document.length - 1];
-          if (lastBlock) {
-            editor.insertBlocks(blocks, lastBlock, "after");
-          } else {
-            editor.replaceBlocks(editor.document, blocks);
+          syncLock.current = true;
+          try {
+            const lastBlock = editor.document[editor.document.length - 1];
+            if (lastBlock) {
+              editor.insertBlocks(blocks, lastBlock, "after");
+            } else {
+              editor.replaceBlocks(editor.document, blocks);
+            }
+            lastEmittedContent.current = JSON.stringify(editor.document);
+          } finally {
+            syncLock.current = false;
           }
-          lastEmittedContent.current = JSON.stringify(editor.document);
           // Trigger a change to ensure the parent clears the paste fields
           onChange?.(editor.document);
         }
@@ -486,6 +555,7 @@ export const BlockNoteEditor = memo(({
     if (!editor || !onChange) return;
 
     const cleanup = editor.onChange(() => {
+      if (syncLock.current) return;
       if (isInitialMount.current) {
         isInitialMount.current = false;
         return;
@@ -508,11 +578,53 @@ export const BlockNoteEditor = memo(({
           editor={editor}
           editable={editable}
           className="min-h-full"
-          theme="dark"
-        />
+          theme={blockNoteTheme}
+          formattingToolbar={false}
+        >
+          {/* Custom Formatting Toolbar with full color picker — Notion-style */}
+          <FormattingToolbarController
+            formattingToolbar={() => (
+              <FormattingToolbar>
+                <BlockTypeSelect key="blockTypeSelect" />
+
+                {/* Text styles */}
+                <BasicTextStyleButton basicTextStyle="bold"      key="bold" />
+                <BasicTextStyleButton basicTextStyle="italic"    key="italic" />
+                <BasicTextStyleButton basicTextStyle="underline" key="underline" />
+                <BasicTextStyleButton basicTextStyle="strike"    key="strike" />
+                <BasicTextStyleButton basicTextStyle="code"      key="inlineCode" />
+
+                {/* Text alignment */}
+                <TextAlignButton textAlignment="left"   key="alignLeft" />
+                <TextAlignButton textAlignment="center" key="alignCenter" />
+                <TextAlignButton textAlignment="right"  key="alignRight" />
+
+                {/* Color & Highlight picker — the Notion-style color menu */}
+                <ColorStyleButton key="colorStyleButton" />
+
+                {/* Nesting */}
+                <NestBlockButton   key="nestBlock" />
+                <UnnestBlockButton key="unnestBlock" />
+
+                {/* Link */}
+                <CreateLinkButton key="createLink" />
+              </FormattingToolbar>
+            )}
+          />
+        </BlockNoteView>
         <style>{`
-          .blocknote-wrapper .bn-container {
+          /* ── Base layout ──────────────────────────────────────────────── */
+          /* Force all Mantine/BlockNote containers to be transparent so the
+             editor inherits the node card background (system theme-aware).  */
+          .blocknote-wrapper,
+          .blocknote-wrapper > *,
+          .blocknote-wrapper .mantine-Paper-root,
+          .blocknote-wrapper .bn-container,
+          .blocknote-wrapper [class^="mantine-"] {
             background: transparent !important;
+            background-color: transparent !important;
+          }
+          .blocknote-wrapper .bn-container {
             padding: 0 !important;
           }
           .blocknote-wrapper .bn-editor {
@@ -529,57 +641,204 @@ export const BlockNoteEditor = memo(({
             --bn-colors-cursor: hsl(var(--primary));
             --bn-border-radius: 12px;
           }
+
+          /* ── Formatting Toolbar — glassmorphism ───────────────────────── */
+          .bn-toolbar {
+            background: hsl(var(--card) / 0.92) !important;
+            backdrop-filter: blur(20px) saturate(180%) !important;
+            border: 1px solid hsl(var(--border) / 0.35) !important;
+            border-radius: 12px !important;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.3) !important;
+            padding: 4px 6px !important;
+          }
+          .bn-toolbar button { border-radius: 6px !important; }
+          .bn-toolbar button:hover { background: hsl(var(--accent)) !important; }
+          .bn-toolbar button[data-active] {
+            background: hsl(var(--primary) / 0.15) !important;
+            color: hsl(var(--primary)) !important;
+          }
+
+          /* ── Code Block container (theme-aware) ───────────────────────── */
           .blocknote-wrapper .bn-block-content[data-content-type="codeBlock"] {
             margin: 1.5rem 0 !important;
           }
           .blocknote-wrapper .bn-code-block {
-            background: hsla(var(--muted), 0.5) !important;
-            backdrop-filter: blur(8px);
-            border-radius: 16px !important;
-            padding: 1.5rem !important;
-            border: 1px solid hsla(var(--glass-border), 0.1) !important;
-            box-shadow: var(--premium-shadow-md) !important;
-            font-family: 'Space Mono', 'Fira Code', monospace !important;
+            background: ${codeBlockBg} !important;
+            color: ${codeBlockText} !important;
+            border: 1px solid ${codeBlockBorder} !important;
+            border-radius: 12px !important;
+            padding: 1.25rem 1.5rem !important;
+            box-shadow: 0 4px 24px rgba(0,0,0,0.25) !important;
+            font-family: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', 'Consolas', monospace !important;
+            font-size: 13.5px !important;
+            font-variant-ligatures: contextual !important;
+            line-height: 1.7 !important;
             position: relative;
-            overflow: hidden;
+            overflow: auto;
           }
+          /* Language badge */
           .blocknote-wrapper .bn-code-block::before {
-            content: 'CODE';
+            content: attr(data-language);
             position: absolute;
-            top: 0;
-            right: 1.5rem;
-            padding: 2px 8px;
-            background: hsl(var(--primary) / 0.1);
-            color: hsl(var(--primary));
-            font-size: 9px;
-            font-weight: 900;
-            letter-spacing: 0.1em;
+            top: 0; right: 1.25rem;
+            padding: 1px 10px 3px;
+            background: rgba(139,92,246,0.10);
+            color: #a78bfa;
+            font-size: 9px; font-weight: 800;
+            letter-spacing: 0.15em; text-transform: uppercase;
             border-radius: 0 0 8px 8px;
-            border: 1px solid hsl(var(--primary) / 0.2);
-            border-top: none;
-            opacity: 0.6;
+            border: 1px solid rgba(139,92,246,0.2); border-top: none;
           }
-          /* Premium Syntax Highlighting synced with App Theme */
-          .hljs-keyword { color: hsl(var(--primary)) !important; font-weight: 700 !important; }
-          .hljs-string { color: #ce9178 !important; }
-          .hljs-comment { color: hsl(var(--muted-foreground)) !important; font-style: italic !important; opacity: 0.6; }
-          .hljs-function { color: #dcdcaa !important; }
-          .hljs-params { color: #9cdcfe !important; }
-          .hljs-number { color: #b5cea8 !important; }
-          .hljs-type { color: #4ec9b0 !important; }
-          .hljs-title { color: #dcdcaa !important; }
-          .hljs-variable { color: #9cdcfe !important; }
-          .hljs-operator { color: hsl(var(--foreground) / 0.8) !important; }
-          
-          /* Selection color */
-          .bn-editor ::selection {
-            background: hsl(var(--primary) / 0.2) !important;
+
+          /* ── Theme-Aware Syntax Palette ───────────────────────────── */
+          .blocknote-wrapper .hljs-keyword,
+          .blocknote-wrapper .hljs-built_in,
+          .blocknote-wrapper .hljs-selector-tag {
+            color: ${isDark ? '#c792ea' : '#d73a49'} !important;
+            font-weight: 600 !important;
+          }
+
+          /* Strings */
+          .blocknote-wrapper .hljs-string,
+          .blocknote-wrapper .hljs-template-variable,
+          .blocknote-wrapper .hljs-template-tag {
+            color: ${isDark ? '#c3e88d' : '#032f62'} !important;
+          }
+
+          /* Numbers & booleans */
+          .blocknote-wrapper .hljs-number { color: ${isDark ? '#f78c6c' : '#005cc5'} !important; }
+          .blocknote-wrapper .hljs-literal { color: ${isDark ? '#ff5874' : '#005cc5'} !important; font-style: italic !important; }
+
+          /* Comments */
+          .blocknote-wrapper .hljs-comment,
+          .blocknote-wrapper .hljs-quote {
+            color: ${isDark ? '#697098' : '#6a737d'} !important;
+            font-style: italic !important;
+          }
+
+          /* Function / method names */
+          .blocknote-wrapper .hljs-title,
+          .blocknote-wrapper .hljs-title\\.function,
+          .blocknote-wrapper .hljs-function > .hljs-title {
+            color: ${isDark ? '#82aaff' : '#6f42c1'} !important;
+            font-weight: 600 !important;
+          }
+
+          /* Type names, class names */
+          .blocknote-wrapper .hljs-type,
+          .blocknote-wrapper .hljs-class,
+          .blocknote-wrapper .hljs-title\\.class {
+            color: ${isDark ? '#ffcb6b' : '#22863a'} !important;
+            font-weight: 600 !important;
+          }
+
+          /* Variables, parameters */
+          .blocknote-wrapper .hljs-variable,
+          .blocknote-wrapper .hljs-params { color: ${isDark ? '#89ddff' : '#24292e'} !important; }
+
+          /* Properties / object keys */
+          .blocknote-wrapper .hljs-property { color: ${isDark ? '#80cbc4' : '#005cc5'} !important; }
+
+          /* Attributes (HTML, JSX) */
+          .blocknote-wrapper .hljs-attr,
+          .blocknote-wrapper .hljs-attribute { color: ${isDark ? '#ffcb6b' : '#005cc5'} !important; }
+
+          /* HTML / JSX tag names */
+          .blocknote-wrapper .hljs-name,
+          .blocknote-wrapper .hljs-tag { color: ${isDark ? '#f07178' : '#22863a'} !important; }
+
+          /* Operators and punctuation */
+          .blocknote-wrapper .hljs-operator  { color: ${isDark ? '#89ddff' : '#d73a49'} !important; opacity:0.85; }
+          .blocknote-wrapper .hljs-punctuation { color: ${isDark ? '#89ddff' : '#24292e'} !important; opacity:0.7; }
+
+          /* CSS selectors */
+          .blocknote-wrapper .hljs-selector-id    { color: ${isDark ? '#82aaff' : '#6f42c1'} !important; }
+          .blocknote-wrapper .hljs-selector-class  { color: ${isDark ? '#ffcb6b' : '#005cc5'} !important; }
+          .blocknote-wrapper .hljs-selector-attr   { color: ${isDark ? '#c3e88d' : '#22863a'} !important; }
+          .blocknote-wrapper .hljs-selector-pseudo { color: ${isDark ? '#89ddff' : '#6f42c1'} !important; }
+
+          /* Regex */
+          .blocknote-wrapper .hljs-regexp        { color: #f07178 !important; }
+
+          /* Decorators / meta / annotation */
+          .blocknote-wrapper .hljs-meta          { color: #b2b2ff !important; }
+          .blocknote-wrapper .hljs-meta .hljs-string { color: #c3e88d !important; }
+
+          /* Section headings (Markdown h1/h2, etc.) */
+          .blocknote-wrapper .hljs-section       { color: #82aaff !important; font-weight: 700 !important; }
+          .blocknote-wrapper .hljs-bullet        { color: #c792ea !important; }
+          .blocknote-wrapper .hljs-emphasis      { color: #f07178 !important; font-style: italic !important; }
+          .blocknote-wrapper .hljs-strong        { color: #f07178 !important; font-weight: 700 !important; }
+          .blocknote-wrapper .hljs-link          { color: #82aaff !important; text-decoration: underline !important; }
+          .blocknote-wrapper .hljs-code          { color: #c3e88d !important; }
+
+          /* Diff additions / deletions */
+          .blocknote-wrapper .hljs-addition {
+            color: #c3e88d !important;
+            background: rgba(195,232,141,0.10) !important;
+          }
+          .blocknote-wrapper .hljs-deletion {
+            color: #f07178 !important;
+            background: rgba(240,113,120,0.12) !important;
+          }
+
+          /* JSON keys go purple */
+          .blocknote-wrapper .hljs-attr { color: #c792ea !important; }
+
+          /* ── Inline code pill — Notion-style ──────────────────────────── */
+          .blocknote-wrapper .bn-inline-content code,
+          .blocknote-wrapper code:not([class*="hljs"]) {
+            background: rgba(139,92,246,0.12) !important;
+            color: #c792ea !important;
+            border: 1px solid rgba(139,92,246,0.20) !important;
+            border-radius: 5px !important;
+            padding: 1px 6px !important;
+            font-family: 'JetBrains Mono', 'Fira Code', monospace !important;
+            font-size: 0.875em !important;
+          }
+
+          /* ── BlockNote named text colors ──────────────────────────────── */
+          [data-text-color="red"]    { color: #ff5874 !important; }
+          [data-text-color="orange"] { color: #f78c6c !important; }
+          [data-text-color="yellow"] { color: #f9c859 !important; }
+          [data-text-color="green"]  { color: #c3e88d !important; }
+          [data-text-color="blue"]   { color: #82aaff !important; }
+          [data-text-color="purple"] { color: #c792ea !important; }
+          [data-text-color="pink"]   { color: #f07178 !important; }
+          [data-text-color="gray"]   { color: #697098 !important; }
+          [data-text-color="brown"]  { color: #c4a882 !important; }
+
+          /* ── BlockNote highlight background colors ─────────────────────── */
+          [data-background-color="red"]    { background: rgba(255,88,116,0.18) !important; border-radius:3px; padding:0 2px; }
+          [data-background-color="orange"] { background: rgba(247,140,108,0.18) !important; border-radius:3px; padding:0 2px; }
+          [data-background-color="yellow"] { background: rgba(249,200,89,0.20) !important;  border-radius:3px; padding:0 2px; }
+          [data-background-color="green"]  { background: rgba(195,232,141,0.16) !important; border-radius:3px; padding:0 2px; }
+          [data-background-color="blue"]   { background: rgba(130,170,255,0.15) !important; border-radius:3px; padding:0 2px; }
+          [data-background-color="purple"] { background: rgba(199,146,234,0.15) !important; border-radius:3px; padding:0 2px; }
+          [data-background-color="pink"]   { background: rgba(240,113,120,0.15) !important; border-radius:3px; padding:0 2px; }
+          [data-background-color="gray"]   { background: rgba(105,112,152,0.15) !important; border-radius:3px; padding:0 2px; }
+          [data-background-color="brown"]  { background: rgba(196,168,130,0.15) !important; border-radius:3px; padding:0 2px; }
+
+          /* ── Misc polish ──────────────────────────────────────────────── */
+          .bn-editor ::selection { background: hsl(var(--primary) / 0.25) !important; }
+          .bn-editor .ProseMirror-focused { caret-color: hsl(var(--primary)); }
+          .bn-suggestion-menu {
+            border-radius: 12px !important;
+            background: hsl(var(--card)) !important;
+            border: 1px solid hsl(var(--border) / 0.15) !important;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.45) !important;
+          }
+          .bn-suggestion-menu-item:hover,
+          .bn-suggestion-menu-item[data-selected="true"] {
+            background: hsl(var(--accent)) !important;
+            border-radius: 8px !important;
           }
         `}</style>
       </div>
     </MantineProvider>
   );
 });
+
 
 /**
  * @function extractTextFromUnknownBlock

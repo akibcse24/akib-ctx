@@ -24,6 +24,7 @@ import { FileAttachmentNode } from '@/components/nodes/FileAttachmentNode';
 import { SpreadsheetNode } from '@/components/nodes/SpreadsheetNode';
 import { DatabaseNode } from '@/components/nodes/DatabaseNode';
 import { DailyLogNode } from '@/components/nodes/DailyLogNode';
+import { V2NoteNode } from '@/components/nodes/V2NoteNode';
 
 export const nodeTypes: NodeTypes = {
   aiNote: AINoteNode,
@@ -51,4 +52,5 @@ export const nodeTypes: NodeTypes = {
   spreadsheet: SpreadsheetNode,
   databaseNode: DatabaseNode,
   dailyLog: DailyLogNode,
+  v2Note: V2NoteNode,
 };

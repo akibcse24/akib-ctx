@@ -19,7 +19,7 @@ import { getEmbedConfig, isRestrictedSite } from '@/lib/utils/embedUtils';
 
 
 /* ─── Expandable node types ─── */
-const EXPANDABLE_TYPES = ['aiNote', 'lectureNotes', 'checklist', 'summary', 'codeSnippet', 'math', 'termQuestion', 'stickyNote', 'flashcard', 'table', 'image', 'embed', 'drawing', 'video', 'text', 'calendar', 'kanban', 'databaseNode', 'spreadsheet', 'fileAttachment', 'group', 'shape', 'dailyLog'];
+const EXPANDABLE_TYPES = ['aiNote', 'lectureNotes', 'checklist', 'summary', 'codeSnippet', 'math', 'termQuestion', 'stickyNote', 'flashcard', 'table', 'image', 'embed', 'drawing', 'video', 'text', 'calendar', 'kanban', 'databaseNode', 'spreadsheet', 'fileAttachment', 'group', 'shape', 'dailyLog', 'v2Note'];
 const POSITION_THRESHOLD = 20;
 
 /* ─── Checklist helpers ─── */
@@ -986,6 +986,7 @@ export function NodeExpandModal() {
     switch (nodeType) {
       case 'aiNote':
       case 'lectureNotes':
+      case 'v2Note':
         return (
           <HybridEditor
             ref={editorRef}
@@ -996,8 +997,8 @@ export function NodeExpandModal() {
             pasteFormat={nodeData.pasteFormat}
             editable={!isViewMode}
             title={getTitle()}
-            forceTiptap={isShareView || nodeData.useBlockEditor === false}
-            forceBlockNote={!isShareView && nodeData.useBlockEditor === true}
+            forceTiptap={nodeType !== 'v2Note' && (isShareView || nodeData.useBlockEditor === false)}
+            forceBlockNote={nodeType === 'v2Note' || (!isShareView && nodeData.useBlockEditor === true)}
           />
         );
       case 'checklist':
